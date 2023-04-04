@@ -1,0 +1,63 @@
+from __future__ import print_function
+from __future__ import division
+
+import time
+import threading
+import gopigo3
+from picamera.array import PiRGBArray
+from picamera import PiCamera
+import cv2
+
+
+
+#GPG.reset_all()
+
+def cameraFunction(camera, raw_capture):
+    for frame in camera.capture_continuous(raw_capture, format="bgr", use_video_port=True):
+        image = frame.array
+        image = cv2.rotate(image, cv2.ROTATE_180)
+	
+        cv2.imshow("Frame", image)
+        key = cv2.waitKey(1) & 0xFF
+        raw_capture.truncate(0)
+        if key == ord('q'):
+            break
+
+def motorControl(GPG):
+    while 1:
+        key = cv2.waitKey(1) & 0XFF
+        if key == ord('w'):
+            GPG.set_motor_power(GPG.MOTOR_LEFT + GPG.MOTOR_RIGHT, 100)
+        elif key == ord('s'):
+            GPG.set_motor_power(GPG.MOTOR_LEFT + GPG.MOTOR_RIGHT, -100)
+        elif key == ord('a'):
+            GPG.set_motor_power(GPG.MOTOR_LEFT, 100)
+            GPG.set_motor_power(GPG.MOTOR_RIGHT, 0)
+        elif key == ord('d'):
+            GPG.set_motor_power(GPG.MOTOR_RIGHT, 100)
+            GPG.set_motor_power(GPG.MOTOR_LEFT, 0)
+        elif key == ord('q'):
+            break
+
+def setUpCamera(size, framerate):
+    camera = PiCamera()
+    camera.resolution = size
+    camera.framerate = framerate
+    raw_capture = PiRGBArray(camera, size = size)
+    return camera, raw_capture
+
+
+if __name__ == "__main__":
+    GPG = gopigo3.GoPiGo3()
+    camera, raw_capture = setUpCamera(size = (640, 480), framerate = 64)
+    threads = list()
+    x = threading.Thread(target = cameraFunction, args = (camera, raw_capture, ))
+    y = threading.Thread(target = motorControl, args = (GPG,))
+    threads.append(x)
+    threads.append(y)
+    for thread in threads:
+        thread.start()
+    time.sleep(0.1)
+    for thread in threads:
+        thread.join()
+    GPG.reset_all()
